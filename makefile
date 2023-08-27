@@ -19,4 +19,4 @@ $(PROG): $(OBJECTS)
 	$(CC) -o $@ $^
 
 clean:
-	rm -f `find . -name '*.o'` $(PROG)
+	rm -f `find . -name '*.o'` $(PROG) *.exe
