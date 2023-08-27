@@ -2,6 +2,7 @@
 #include <string.h>
 #include <assert.h>
 #include "ipc.h"
+#include "pid.h"
 
 struct sync {
   struct condvar cnd;
@@ -37,6 +38,7 @@ static void do_connect(void *ipc, const char *arg0)
 {
   struct sync *s = ipc_alloc(ipc, sizeof(*s));
   char *msg;
+  unsigned pid = my_pid();
 
   ipc_cond_init(ipc, &s->cnd);
   ipc_rwlock_init(ipc, &s->lock);
@@ -44,9 +46,10 @@ static void do_connect(void *ipc, const char *arg0)
 
   msg = ipc_msg_get(ipc, 256);
   assert(msg);
-  sprintf(msg, "Hello World from %s\n", arg0);
+  sprintf(msg, "Hello World from %s:%i", arg0, pid);
   ipc_msg_put(ipc);
 
+  printf("connecting to server from pid %i\n", pid);
   rwlock_wrlock(&s->lock);
   *s->cpred = 1;
   rwlock_unlock(&s->lock);

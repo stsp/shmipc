@@ -1,6 +1,6 @@
 CFLAGS ?= -Wall -Wmissing-prototypes
 OS ?= $(shell uname -s)
-SOURCES = $(OS)/shm.c rwlock.c condvar.c ipc.c pgalloc.c main.c
+SOURCES = $(OS)/shm.c $(OS)/pid.c rwlock.c condvar.c ipc.c pgalloc.c main.c
 _PROG = shmipc
 ifeq ($(OS),Linux)
 SOURCES += $(OS)/shlock.c
