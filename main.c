@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include <assert.h>
 #include "ipc.h"
 
@@ -11,24 +12,40 @@ struct sync {
 static void do_accept(void *ipc)
 {
   struct sync *s = ipc_alloc(ipc, sizeof(*s));
+  const char *msg;
+
   ipc_cond_init(ipc, &s->cnd);
   ipc_rwlock_init(ipc, &s->lock);
   s->cpred = ipc_cpred(ipc);
 
   rwlock_rdlock(&s->lock);
-  while (!*s->cpred)
+  while (!*s->cpred) {
+    printf("waiting for client...\n");
     cond_wait(&s->cnd, &s->lock);
+  }
   rwlock_unlock(&s->lock);
+
+  msg = ipc_msg(ipc);
+  assert(msg);
+  printf("client connected: %s\n", msg);
+  ipc_msg_put(ipc);
+
   ipc_free(ipc, s);
-  printf("client connected\n");
 }
 
-static void do_connect(void *ipc)
+static void do_connect(void *ipc, const char *arg0)
 {
   struct sync *s = ipc_alloc(ipc, sizeof(*s));
+  char *msg;
+
   ipc_cond_init(ipc, &s->cnd);
   ipc_rwlock_init(ipc, &s->lock);
   s->cpred = ipc_cpred(ipc);
+
+  msg = ipc_msg_get(ipc, 256);
+  assert(msg);
+  sprintf(msg, "Hello World from %s\n", arg0);
+  ipc_msg_put(ipc);
 
   rwlock_wrlock(&s->lock);
   *s->cpred = 1;
@@ -37,14 +54,14 @@ static void do_connect(void *ipc)
   ipc_free(ipc, s);
 }
 
-int main()
+int main(int argc, char *argv[])
 {
   void *ipc = ipc_attach("testipc", 1);
   assert(ipc);
   if (ipc_is_first(ipc))
     do_accept(ipc);
   else
-    do_connect(ipc);
+    do_connect(ipc, argv[0]);
   ipc_detach(ipc);
   return 0;
 }

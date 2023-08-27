@@ -18,6 +18,8 @@ struct ipc_shm {
     int cpred;
     int lvar;
     int pga[PGA_LEN];
+    char *shm_mb;
+    int mb_lvar;
     char *data;
 };
 
@@ -26,6 +28,7 @@ struct ipc_desc {
     struct ipc_shm *ishm;
     int oused;
     ptrdiff_t ptroff;
+    struct rwlock mb_lck;
 };
 
 void *ipc_attach(const char *name, unsigned pages)
@@ -44,6 +47,7 @@ void *ipc_attach(const char *name, unsigned pages)
     ishm->data = (char *)P2ALIGN((uintptr_t)(ishm + 1), 64);
     wq_init(&ishm->wq);
     ishm->self = (char *)ishm;
+    ishm->shm_mb = NULL;
   }
   ishm->used++;
   shm_unlock(shm);
@@ -54,6 +58,7 @@ void *ipc_attach(const char *name, unsigned pages)
   dsc->ishm = ishm;
   dsc->oused = oused;
   dsc->ptroff = ishm->self - (char *)ishm;
+  rwlock_init(&dsc->mb_lck, &ishm->mb_lvar);
   return dsc;
 }
 
@@ -128,4 +133,32 @@ int *ipc_cpred(void *handle)
 {
   struct ipc_desc *dsc = handle;
   return &dsc->ishm->cpred;
+}
+
+char *ipc_msg_get(void *handle, unsigned size)
+{
+  struct ipc_desc *dsc = handle;
+  struct ipc_shm *ishm = dsc->ishm;
+
+  rwlock_wrlock(&dsc->mb_lck);
+  if (ishm->shm_mb)
+    pgafree(ishm->pga, (ishm->shm_mb - ishm->data) >> 6);
+  ishm->shm_mb = ishm->data +
+      (pgaalloc(ishm->pga, P2ALIGN(size, 64) >> 6, 0) << 6);
+  return _RP(ishm->shm_mb, dsc->ptroff);
+}
+
+void ipc_msg_put(void *handle)
+{
+  struct ipc_desc *dsc = handle;
+  rwlock_unlock(&dsc->mb_lck);
+}
+
+const char *ipc_msg(void *handle)
+{
+  struct ipc_desc *dsc = handle;
+  struct ipc_shm *ishm = dsc->ishm;
+
+  rwlock_rdlock(&dsc->mb_lck);
+  return _RP(ishm->shm_mb, dsc->ptroff);
 }

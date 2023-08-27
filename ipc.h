@@ -14,4 +14,8 @@ void ipc_cond_init(void *handle, struct condvar *cnd);
 void ipc_rwlock_init(void *handle, struct rwlock *lock);
 int *ipc_cpred(void *handle);
 
+char *ipc_msg_get(void *handle, unsigned size);
+void ipc_msg_put(void *handle);
+const char *ipc_msg(void *handle);
+
 #endif
